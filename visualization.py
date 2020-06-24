@@ -14,10 +14,11 @@ class Colors:
     RED = 255, 0, 0
     GREEN = 0, 255, 0
     BLUE = 0, 233, 255
-    ORANGE = 255, 165, 0
+    YELLOW = 255, 242, 0
+    ORANGE = 255, 121, 0  # Merge of RED and YELLOW
 
 
-ARRAY = [12, 58, 21, 13, 18, 42, 35, 49, 10, 3, 50, 28, 55, 1, 8, 3, 24, 49]
+ARRAY = [12, 58, 21, 13, 18, 42, 35, 49, 10, 3, 50, 28, 55, 4, 8, 9, 24, 49]
 STATES = defaultdict(lambda: Colors.WHITE)
 
 
@@ -38,7 +39,7 @@ class QuickSort:
 
         for i in range(start, end):
             STATES[i] = Colors.BLUE
-        STATES[end] = Colors.ORANGE
+        STATES[end] = Colors.GREEN
         self.game.update_screen()
 
         # Go through start-end elements and swap with pivot_index
@@ -46,8 +47,10 @@ class QuickSort:
         # after swap, increment the pivot_index
         for i in range(start, end):
             # Highlight pivot index and `i` and update screen
+            STATES[i] = Colors.YELLOW
             STATES[pivot_index] = Colors.RED
-            STATES[i] = Colors.GREEN
+            if i == pivot_index:
+                STATES[i] = Colors.ORANGE
             self.game.update_screen()
 
             if ARRAY[i] < pivot_value:
