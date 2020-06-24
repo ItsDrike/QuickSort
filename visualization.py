@@ -1,162 +1,164 @@
-import typing as t
-import pygame
-import time
 import sys
-from contextlib import suppress
+import time
+from collections import defaultdict
+
+import pygame
+
+from util import list_remap
 
 
-SIZE = WIDTH, HEIGHT = 500, 350
-
-BLACK = 0, 0, 0
-RED = 255, 0, 0
-BLUE = 0, 0, 255
-WHITE = 255, 255, 255
-
-MINIMUM_LINE_LENGTH = 50
-SEPARATION = 8
-
-TICK_RATE = 10
-
-PIVOT_INDEXES = []
-PROCESSING_INDEXES = []
+class Colors:
+    """This class is only used to store colors."""
+    WHITE = 255, 255, 255
+    BLACK = 0, 0, 0
+    RED = 255, 0, 0
+    GREEN = 0, 255, 0
+    BLUE = 0, 233, 255
+    ORANGE = 255, 165, 0
 
 
-def update_screen(screen: pygame.Surface, fps_clock: pygame.time.Clock, arr: t.List[int], no_tick=False) -> None:
-    screen.fill(BLACK)
-    draw_lines(screen, WHITE, RED, BLUE, arr)
-    pygame.display.update()
-    if not no_tick:
-        fps_clock.tick(TICK_RATE)
+ARRAY = [12, 58, 21, 13, 18, 42, 35, 49, 10, 3, 50, 28, 55, 1, 8, 3, 24, 49]
+STATES = defaultdict(lambda: Colors.WHITE)
 
 
-def swap(arr: list, index1: int, index2: int):
-    temp = arr[index1]
-    arr[index1] = arr[index2]
-    arr[index2] = temp
+class QuickSort:
+    """This class stores functions regarding the Quick Sort algorithm."""
+    def __init__(self, game: "Game") -> None:
+        self.game = game
+
+    def partition(self, start: int, end: int) -> int:
+        """
+        Change the array in a way so that the last element (pivot)
+        will be in the centre and all elements will either before or after it.
+        Elements before the pivot are greater, elements after it are smaller.
+        """
+        # Set pivot as last element (for convenience)
+        pivot_value = ARRAY[end]
+        pivot_index = start
+
+        for i in range(start, end):
+            STATES[i] = Colors.BLUE
+        STATES[end] = Colors.ORANGE
+        self.game.update_screen()
+
+        # Go through start-end elements and swap with pivot_index
+        # whenever value is less than pivots value
+        # after swap, increment the pivot_index
+        for i in range(start, end):
+            # Highlight pivot index and `i` and update screen
+            STATES[pivot_index] = Colors.RED
+            STATES[i] = Colors.GREEN
+            self.game.update_screen()
+
+            if ARRAY[i] < pivot_value:
+                ARRAY[i], ARRAY[pivot_index] = ARRAY[pivot_index], ARRAY[i]
+                pivot_index += 1
+                # Reset old pivot index to blue
+                STATES[pivot_index - 1] = Colors.BLUE
+
+            # Reset `i` to blue and update screen
+            STATES[i] = Colors.BLUE
+            self.game.update_screen()
+
+        # Preform last swap to get the pivot in the middle
+        ARRAY[end], ARRAY[pivot_index] = ARRAY[pivot_index], ARRAY[end]
+        STATES[end], STATES[pivot_index] = STATES[pivot_index], STATES[end]
+        self.game.update_screen()
+
+        for i in range(start, end + 1):
+            STATES[i] = Colors.WHITE
+        self.game.update_screen()
+
+        return pivot_index
+
+    def sort(self, start: int, end: int) -> None:
+        """
+        Keep re-partitioning increasingly smaller chunks of the list
+        until the list is fully repartitioned, in which case it is sorted.
+        """
+        # Stop when start reaches end (that section is now sorted)
+        if start >= end:
+            return
+
+        # get pivot index (middle value, to which things are sorted)
+        index = self.partition(start, end)
+        # Sort values in the 2 remaining sections (before and after pivot middle value)
+        self.sort(start, index - 1)
+        self.sort(index + 1, end)
 
 
-def partition(screen: pygame.Surface, fps_clock: pygame.time.Clock, arr: list, start: int, end: int) -> int:
-    for i in range(start, end):
-        PROCESSING_INDEXES.append(i)
-        update_screen(screen, fps_clock, arr, no_tick=True)
+class Game:
+    # How far are individual lines from each other
+    SEPARATION = 8
+    # How fast should the tick rate be
+    TICK_RATE = 5
+    # Set window parameters
+    SIZE = WIDTH, HEIGHT = 400, 350
 
-    # Set pivot as last element (for convenience)
-    pivot_value = arr[end]
-    pivot_index = start
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode(Game.SIZE)
+        self.fps_clock = pygame.time.Clock()
 
-    PIVOT_INDEXES.append(pivot_index)
-    update_screen(screen, fps_clock, arr)
+    def handle_user_quit(self) -> None:
+        """If user quits, exit the game and stop program."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    # Go through start-end elements and swap with pivot_index
-    # whenever value is less than pivots value
-    # after swap, increment the pivot_index
-    for i in range(start, end):
-        if arr[i] < pivot_value:
-            swap(arr, i, pivot_index)
-            PIVOT_INDEXES.remove(pivot_index)
-            PROCESSING_INDEXES.remove(pivot_index)
-            update_screen(screen, fps_clock, arr)
-            pivot_index += 1
-            PIVOT_INDEXES.append(pivot_index)
-            update_screen(screen, fps_clock, arr)
-    # Preform last swap to get the pivot in the middle
-    swap(arr, end, pivot_index)
+    def redraw_screen(self) -> None:
+        """
+        Redraw all lines on the screen.
 
-    for i in range(start, end):
-        with suppress(ValueError):
-            PROCESSING_INDEXES.remove(i)
-        update_screen(screen, fps_clock, arr, no_tick=True)
+        This does not update the screen, it only redraws it.
+        """
+        # Reset screen to black
+        self.screen.fill(Colors.BLACK)
 
-    return pivot_index
+        # Map values from array onto pygame window height
+        arr = list_remap(ARRAY, (0, Game.HEIGHT))
 
+        # Draw individual lines
+        for index, value in enumerate(arr):
+            # Round the value before working with it
+            # This is necessary because pygame doesn't accept floats
+            value = round(value)
 
-def quick_sort(screen: pygame.Surface, fps_clock: pygame.time.Clock, arr: list, start: int, end: int) -> None:
-    # Stop when start reaches end (that section is now sorted)
-    if start >= end:
-        return
+            # Start with 10 units gap, draw lines with given separation between them
+            x_pos = 10 + index * Game.SEPARATION
+            # Subtract the value from height, pygame is inverted on Y axis
+            y_pos = Game.HEIGHT - value
 
-    # get pivot index (middle value, to which things are sorted)
-    index = partition(screen, fps_clock, arr, start, end)
-    PIVOT_INDEXES.remove(index)
-    update_screen(screen, fps_clock, arr)
+            pos1 = (x_pos, Game.HEIGHT)
+            pos2 = (x_pos, y_pos)
 
-    # Sort values in the 2 remaining sections (before and after pivot middle value)
-    quick_sort(screen, fps_clock, arr, start, index - 1),
-    quick_sort(screen, fps_clock, arr, index + 1, end)
+            color = STATES[index]
 
+            pygame.draw.line(self.screen, color, pos1, pos2)
 
-def remap(value: t.Union[int, float], from_range: t.Tuple[int, int], to_range: t.Tuple[int, int]) -> t.Union[int, float]:
-    """Remap any given number within given range into another range."""
-    old_range = from_range[1] - from_range[0]
-    new_range = to_range[1] - to_range[0]
+    def update_screen(self, tick: bool = True) -> None:
+        """
+        Update the screen accordingly to `redraw_screen`
+        also check for user quit and tick (until specified otherwise).
+        """
+        self.handle_user_quit()
+        self.redraw_screen()
 
-    new_value = (((value - from_range[0]) * new_range) / old_range) + to_range[0]
-    return new_value
-
-
-def list_remap(LIST: t.List[t.Union[int, float]], range: t.Tuple[int, int]) -> t.List[t.Union[int, float]]:
-    """Remap all values withing given list into another range."""
-    original_range = (min(LIST), max(LIST))
-
-    result = []
-    for element in LIST:
-        result.append(remap(element, original_range, range))
-
-    return result
+        # Update the display and tick when needed
+        pygame.display.update()
+        if tick:
+            self.fps_clock.tick(Game.TICK_RATE)
 
 
-def draw_lines(
-    screen: pygame.Surface,
-    main_color: t.Tuple[int, int, int],
-    pivot_color: t.Tuple[int, int, int],
-    processing_color: t.Tuple[int, int, int],
-    LIST: t.List[int],
-) -> t.List[int]:
-    LIST = list_remap(LIST, (0, HEIGHT - MINIMUM_LINE_LENGTH))
-    lines = []
-    for index, value in enumerate(LIST):
-        # Start with 20 units gap, and draw lines with SEPARATION units separation on X
-        x_pos = 20 + index * SEPARATION
-        # Get height on Y axis
-        y_pos = HEIGHT - value - MINIMUM_LINE_LENGTH
-        if index in PIVOT_INDEXES:
-            color = pivot_color
-        elif index in PROCESSING_INDEXES:
-            color = processing_color
-        else:
-            color = main_color
+game = Game()
+quick_sort = QuickSort(game)
 
-        # Draw the lines and add them into `lines` list
-        line = pygame.draw.line(screen, color, (x_pos, HEIGHT), (x_pos, round(y_pos)))
-        lines.append(line)
+# Starting timeout
+time.sleep(2)
 
-    return lines
+quick_sort.sort(0, len(ARRAY) - 1)
+game.update_screen()
 
-
-def main_loop(screen: pygame.Surface, fps_clock: pygame.time.Clock, LIST: t.List[int]) -> None:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-    quick_sort(screen, fps_clock, LIST, 0, len(LIST) - 1)
-
-    update_screen(screen, fps_clock, LIST)
-
-    time.sleep(3)
-
-
-def pygame_start(LIST: t.List[int]) -> None:
-    pygame.init()
-    screen = pygame.display.set_mode(SIZE)
-    fps_clock = pygame.time.Clock()
-
-    # Don't start straight away
-    time.sleep(8)
-
-    main_loop(screen, fps_clock, LIST)
-
-
-if __name__ == "__main__":
-    LIST = [1, 5, 8, 3, 2, 9, 6, 10, 12, 11, 7, 13, 16, 14, 15]
-    pygame_start(LIST)
+# Don't stop straight away
+time.sleep(3)
